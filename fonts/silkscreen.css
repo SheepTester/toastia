@@ -1,0 +1,8 @@
+/* https://kottke.org/plus/type/silkscreen/ */
+
+@font-face {
+  font-family: 'Silkscreen';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./slkscr.ttf');
+}
