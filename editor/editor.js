@@ -46,7 +46,7 @@ class Tile {
     if (!tiles[this.id]) tiles[this.id] = [];
     if (atBottom) {
       this.position = 0;
-      tiles[this.id].forEach(tile => tile.elem.style.zIndex = tile.position++);
+      tiles[this.id].forEach(tile => tile.elem.style.zIndex = ++tile.position);
       tiles[this.id].splice(0, 0, this);
     } else {
       this.position = tiles[this.id].push(this) - 1;
@@ -58,7 +58,7 @@ class Tile {
     if (this.id) {
       const index = tiles[this.id].indexOf(this);
       tiles[this.id].splice(index, 1);
-      tiles[this.id].slice(index).forEach(tile => tile.elem.style.zIndex = tile.position--);
+      tiles[this.id].slice(index).forEach(tile => tile.elem.style.zIndex = --tile.position);
       if (!tiles[this.id].length) delete tiles[this.id];
       this.id = null;
     }
@@ -100,7 +100,7 @@ function placeTile({x, y}) {
     const tileX = x / GRID_SIZE >> 0;
     const tileY = y / GRID_SIZE >> 0;
     if (isAcceptablePlacement({x, y}, currentTile)) {
-      new Tile({tile: currentTile, x: tileX, y: tileY});
+      new Tile({tile: currentTile, x: tileX, y: tileY, atBottom: !tileData[currentTile][2]});
     }
   }
 }

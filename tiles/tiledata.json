@@ -1,5 +1,8 @@
 {
   "stone-slabs": ["stone-slabs.png", "Stone slabs", false],
   "viney-stone-slabs": ["stone-slabs-vines.png", "Stone slabs with vines", false],
-  "sign": ["sign.png", "Sign", true]
+  "sign": ["sign.png", "Sign", true],
+  "heckstone": ["steven-heckstone.png", "Heckstone", false],
+  "steven-path": ["steven-path.png", "Agitated Heckstone Path", false],
+  "steven-rock": ["steven-rock.png", "Butidk chunk", true]
 }
