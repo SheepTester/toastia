@@ -31,6 +31,7 @@ class Tile {
     this.setTile(tile);
     this.setPos({x, y}, atBottom);
     this.data = null;
+    this.selected = false;
   }
 
   setTile(tile) {
@@ -41,8 +42,9 @@ class Tile {
   setPos({x, y}, atBottom = false) {
     this.leavePos();
 
+    this.pos = {x, y};
     this.id = `${x},${y}`;
-    this.elem.style.transform = `translate(${x * GRID_SIZE}px, ${y * GRID_SIZE}px)`;
+    this.setExactPos(x * GRID_SIZE, y * GRID_SIZE);
     if (!tiles[this.id]) tiles[this.id] = [];
     if (atBottom) {
       this.position = 0;
@@ -52,6 +54,20 @@ class Tile {
       this.position = tiles[this.id].push(this) - 1;
     }
     this.elem.style.zIndex = this.position;
+    if (this.selected) {
+      selections[this.id] = true;
+    }
+  }
+
+  setExactPos(x, y) {
+    this.elem.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  setSelect(selected) {
+    if (selected === this.selected) return;
+    this.selected = selected;
+    if (selected) this.elem.classList.add('selected');
+    else this.elem.classList.remove('selected');
   }
 
   leavePos() {
@@ -60,7 +76,11 @@ class Tile {
       tiles[this.id].splice(index, 1);
       tiles[this.id].slice(index).forEach(tile => tile.elem.style.zIndex = --tile.position);
       if (!tiles[this.id].length) delete tiles[this.id];
+      if (this.selected) {
+        delete selections[this.id];
+      }
       this.id = null;
+      this.pos = null;
     }
   }
 
@@ -107,6 +127,7 @@ function placeTile({x, y}) {
 
 let mouseMode = null;
 let currentTile = null;
+let selections = null;
 function init([tileDataJSON]) {
   tileData = tileDataJSON;
 
@@ -119,9 +140,22 @@ function init([tileDataJSON]) {
     if (!mouseMode) {
       const {x, y} = untranslate({x: e.clientX, y: e.clientY});
       const id = toGrid({x, y});
-      if (e.shiftKey) {
-        //
-      } else if (currentTile === null) {
+      if (e.which === 2) {
+        if (tiles[id]) currentTile = tiles[id][tiles[id].length - 1].tile;
+      } else if (e.shiftKey) {
+        const deselecting = selections && selections[id];
+        if (!selections) selections = {};
+        const box = document.createElement('div');
+        box.classList.add('selection-box');
+        tilesWrapper.appendChild(box);
+        mouseMode = {
+          type: 'select',
+          xInit: x,
+          yInit: y,
+          deselecting,
+          box
+        };
+      } else if (currentTile === null || selections && !selections[id]) {
         mouseMode = {
           type: 'scroll',
           initMouseX: e.clientX,
@@ -129,6 +163,21 @@ function init([tileDataJSON]) {
           initCamX: camera.x,
           initCamY: camera.y,
           initCamScale: camera.scale
+        };
+      } else if (selections && selections[id]) {
+        mouseMode = {
+          type: 'drag',
+          tiles: Object.keys(selections).map(id => {
+            const obj = {
+              xOffset: tiles[id][0].pos.x * GRID_SIZE - x,
+              yOffset: tiles[id][0].pos.y * GRID_SIZE - y,
+              tiles: [...tiles[id]]
+            };
+            obj.tiles.forEach(tile => {
+              tile.leavePos();
+            });
+            return obj;
+          })
         };
       } else {
         placeTile({x, y});
@@ -153,12 +202,68 @@ function init([tileDataJSON]) {
           placeTile({x, y});
           mouseMode.placed[id] = true;
         }
+      } else if (mouseMode.type === 'select') {
+        const xMin = Math.min(x, mouseMode.xInit);
+        const xMax = Math.max(x, mouseMode.xInit);
+        const yMin = Math.min(y, mouseMode.yInit);
+        const yMax = Math.max(y, mouseMode.yInit);
+        mouseMode.box.style.left = xMin + 'px';
+        mouseMode.box.style.top = yMin + 'px';
+        mouseMode.box.style.width = xMax - xMin + 'px';
+        mouseMode.box.style.height = yMax - yMin + 'px';
+      } else if (mouseMode.type === 'drag') {
+        mouseMode.tiles.forEach(({tiles, xOffset, yOffset}) => {
+          tiles.forEach(tile => {
+            tile.setExactPos(x + xOffset, y + yOffset);
+          });
+        });
       }
       e.preventDefault();
     }
   });
   document.addEventListener('mouseup', e => {
     if (mouseMode) {
+      const {x, y} = untranslate({x: e.clientX, y: e.clientY});
+      const id = toGrid({x, y});
+      if (mouseMode.type === 'select') {
+        const xMin = Math.floor(Math.min(x, mouseMode.xInit) / GRID_SIZE);
+        const xMax = Math.ceil(Math.max(x, mouseMode.xInit) / GRID_SIZE);
+        const yMin = Math.floor(Math.min(y, mouseMode.yInit) / GRID_SIZE);
+        const yMax = Math.ceil(Math.max(y, mouseMode.yInit) / GRID_SIZE);
+        tilesWrapper.removeChild(mouseMode.box);
+        let changed = 0;
+        for (let x = xMin; x < xMax; x++) for (let y = yMin; y < yMax; y++) {
+          const id = `${x},${y}`;
+          if (tiles[id]) {
+            if (mouseMode.deselecting) {
+              tiles[id].forEach(t => t.setSelect(false));
+              delete selections[id];
+            } else {
+              tiles[id].forEach(t => t.setSelect(true));
+              selections[id] = true;
+            }
+            changed++;
+          }
+        }
+        if (changed === 0) {
+          Object.keys(selections).forEach(id => {
+            tiles[id].forEach(t => t.setSelect(false));
+          });
+          selections = null;
+        }
+      } else if (mouseMode.type === 'drag') {
+        mouseMode.tiles.forEach(({tiles: tileStack, xOffset, yOffset}) => {
+          const pos = {
+            x: Math.round((x + xOffset) / GRID_SIZE),
+            y: Math.round((y + yOffset) / GRID_SIZE)
+          };
+          const id = `${pos.x},${pos.y}`;
+          if (tiles[id]) [...tiles[id]].forEach(t => t.remove());
+          tileStack.forEach(tile => {
+            tile.setPos(pos);
+          });
+        });
+      }
       mouseMode = null;
       e.preventDefault();
     }
