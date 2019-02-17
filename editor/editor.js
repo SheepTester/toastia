@@ -22,14 +22,19 @@ const tiles = {};
 let tileData;
 class Tile {
 
-  constructor({tile = 'stone-slabs', x = 0, y = 0, atBottom = false, data = null}) {
+  constructor({tile = 'stone-slabs', x = 0, y = 0, atBottom = false, data = null, noPosition = false}) {
     const elem = document.createElement('div');
     elem.classList.add('tile');
     this.elem = elem;
     tilesWrapper.appendChild(elem);
 
     this.setTile(tile);
-    this.setPos({x, y}, atBottom);
+    if (noPosition) {
+      this.id = null;
+      this.pos = null;
+    } else {
+      this.setPos({x, y}, atBottom);
+    }
     this.data = data;
     this.selected = false;
   }
@@ -144,6 +149,83 @@ function deselectAll() {
       tiles[id].forEach(t => t.setSelect(false));
     });
     selections = null;
+  }
+}
+function deleteSelected() {
+  if (selections) {
+    const changes = {};
+    Object.keys(selections).forEach(id => {
+      changes[id] = [...tiles[id]].map(t => (t.remove(), t.getData()));
+    });
+    submitChanges(changes);
+    selections = null;
+  }
+}
+function importJSON(exported) {
+  deselectAll();
+  selections = {};
+  mouseMode = {
+    type: 'drag',
+    tiles: exported.map(({tiles, x, y}) => ({
+      xOffset: x * GRID_SIZE,
+      yOffset: y * GRID_SIZE,
+      tiles: tiles.map(({tile, data}) => {
+        const newTile = new Tile({noPosition: true, tile, data});
+        newTile.selected = true;
+        newTile.elem.classList.add('selected');
+        return newTile;
+      })
+    })),
+    changes: {}
+  };
+}
+function exportSelected() {
+  if (selections) {
+    const exported = [];
+    let minX = Infinity, minY = Infinity;
+    Object.keys(selections).forEach(id => {
+      const [x, y] = id.split(',').map(Number);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      exported.push({tiles: tiles[id].map(t => t.getData()), x, y});
+    });
+    exported.forEach(entry => {
+      entry.x -= minX;
+      entry.y -= minY;
+    });
+    return JSON.stringify(exported);
+  } else {
+    return '{}';
+  }
+}
+document.addEventListener('cut', e => {
+  if (selections && !mouseMode) {
+    e.clipboardData.setData('text/plain', exportSelected());
+    deleteSelected();
+    e.preventDefault();
+  }
+});
+document.addEventListener('copy', e => {
+  if (selections && !mouseMode) {
+    e.clipboardData.setData('text/plain', exportSelected());
+    e.preventDefault();
+  }
+});
+document.addEventListener('paste', e => {
+  if (!mouseMode) {
+    try {
+      const json = JSON.parse(e.clipboardData.getData('text/plain'));
+      importJSON(json);
+      e.preventDefault();
+    } catch (e) {
+      // oh well
+    }
+  }
+});
+function submitChanges(changes) {
+  if (Object.keys(changes).length) {
+    undoHist.push(changes);
+    redoHist = [];
   }
 }
 function doMaker(inArray, outArray) {
@@ -271,8 +353,7 @@ function init([tileDataJSON]) {
       const {x, y} = untranslate({x: e.clientX, y: e.clientY});
       const id = toGrid({x, y});
       if (mouseMode.type === 'placing') {
-        if (Object.keys(mouseMode.changes).length)
-          undoHist.push(mouseMode.changes);
+        submitChanges(mouseMode.changes);
       } else if (mouseMode.type === 'select') {
         const xMin = Math.floor(Math.min(x, mouseMode.xInit) / GRID_SIZE);
         const xMax = Math.ceil(Math.max(x, mouseMode.xInit) / GRID_SIZE);
@@ -310,8 +391,7 @@ function init([tileDataJSON]) {
             tile.setPos(pos);
           });
         });
-        if (Object.keys(mouseMode.changes).length)
-          undoHist.push(mouseMode.changes);
+        submitChanges(mouseMode.changes);
       }
       mouseMode = null;
       e.preventDefault();
