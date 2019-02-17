@@ -30,7 +30,7 @@ class Tile {
 
     this.setTile(tile);
     this.setPos({x, y}, atBottom);
-    this.data = null;
+    this.data = data;
     this.selected = false;
   }
 
@@ -90,6 +90,10 @@ class Tile {
     this.removed = true;
   }
 
+  getData() {
+    return {tile: this.tile, data: this.data};
+  }
+
 }
 
 let tilesWrapper;
@@ -112,15 +116,20 @@ function isAcceptablePlacement(location, tile) { // alarmingly strict
     return true;
   }
 }
-function placeTile({x, y}) {
+function placeTile({x, y}, changesObj = {}) {
+  const id = toGrid({x, y});
+  const changeEntry = tiles[id] ? tiles[id].map(t => t.getData()) : [];
   if (currentTile === 0) {
-    const id = toGrid({x, y});
-    if (tiles[id]) [...tiles[id]].forEach(t => t.remove());
+    if (tiles[id]) {
+      [...tiles[id]].forEach(t => t.remove());
+      changesObj[id] = changeEntry;
+    }
   } else {
     const tileX = x / GRID_SIZE >> 0;
     const tileY = y / GRID_SIZE >> 0;
     if (isAcceptablePlacement({x, y}, currentTile)) {
       new Tile({tile: currentTile, x: tileX, y: tileY, atBottom: !tileData[currentTile][2]});
+      changesObj[id] = changeEntry;
     }
   }
 }
@@ -128,6 +137,37 @@ function placeTile({x, y}) {
 let mouseMode = null;
 let currentTile = null;
 let selections = null;
+let undoHist = [], redoHist = [];
+function deselectAll() {
+  if (selections) {
+    Object.keys(selections).forEach(id => {
+      tiles[id].forEach(t => t.setSelect(false));
+    });
+    selections = null;
+  }
+}
+function doMaker(inArray, outArray) {
+  return () => {
+    deselectAll();
+    if (inArray.length) {
+      const entry = inArray.pop();
+      const newEntry = {};
+      Object.keys(entry).map(id => {
+        const newTileEntry = tiles[id] ? [...tiles[id]].map(t => (t.remove(), t.getData())) : [];
+        newEntry[id] = newTileEntry;
+        const newTiles = entry[id];
+        if (!newTiles.length) return;
+        const [x, y] = id.split(',').map(Number);
+        newTiles.forEach(({tile, data}) => {
+          new Tile({tile, data, x, y});
+        });
+      })
+      outArray.push(newEntry);
+    }
+  };
+}
+const undo = doMaker(undoHist, redoHist);
+const redo = doMaker(redoHist, undoHist);
 function init([tileDataJSON]) {
   tileData = tileDataJSON;
 
@@ -165,6 +205,7 @@ function init([tileDataJSON]) {
           initCamScale: camera.scale
         };
       } else if (selections && selections[id]) {
+        const changes = {};
         mouseMode = {
           type: 'drag',
           tiles: Object.keys(selections).map(id => {
@@ -173,18 +214,22 @@ function init([tileDataJSON]) {
               yOffset: tiles[id][0].pos.y * GRID_SIZE - y,
               tiles: [...tiles[id]]
             };
+            changes[id] = tiles[id].map(t => t.getData());
             obj.tiles.forEach(tile => {
               tile.leavePos();
             });
             return obj;
-          })
+          }),
+          changes
         };
       } else {
-        placeTile({x, y});
+        const changes = {};
+        placeTile({x, y}, changes);
         mouseMode = {
           type: 'placing',
-          placed: {[id]: true}
-        }
+          placed: {[id]: true},
+          changes
+        };
       }
     }
     e.preventDefault();
@@ -199,7 +244,7 @@ function init([tileDataJSON]) {
         camera.y = initCamY + initMouseY / initCamScale - e.clientY / camera.scale;
       } else if (mouseMode.type === 'placing') {
         if (!mouseMode.placed[id]) {
-          placeTile({x, y});
+          placeTile({x, y}, mouseMode.changes);
           mouseMode.placed[id] = true;
         }
       } else if (mouseMode.type === 'select') {
@@ -225,7 +270,10 @@ function init([tileDataJSON]) {
     if (mouseMode) {
       const {x, y} = untranslate({x: e.clientX, y: e.clientY});
       const id = toGrid({x, y});
-      if (mouseMode.type === 'select') {
+      if (mouseMode.type === 'placing') {
+        if (Object.keys(mouseMode.changes).length)
+          undoHist.push(mouseMode.changes);
+      } else if (mouseMode.type === 'select') {
         const xMin = Math.floor(Math.min(x, mouseMode.xInit) / GRID_SIZE);
         const xMax = Math.ceil(Math.max(x, mouseMode.xInit) / GRID_SIZE);
         const yMin = Math.floor(Math.min(y, mouseMode.yInit) / GRID_SIZE);
@@ -246,10 +294,7 @@ function init([tileDataJSON]) {
           }
         }
         if (changed === 0) {
-          Object.keys(selections).forEach(id => {
-            tiles[id].forEach(t => t.setSelect(false));
-          });
-          selections = null;
+          deselectAll();
         }
       } else if (mouseMode.type === 'drag') {
         mouseMode.tiles.forEach(({tiles: tileStack, xOffset, yOffset}) => {
@@ -258,11 +303,15 @@ function init([tileDataJSON]) {
             y: Math.round((y + yOffset) / GRID_SIZE)
           };
           const id = `${pos.x},${pos.y}`;
+          if (!mouseMode.changes[id])
+            mouseMode.changes[id] = tiles[id] ? tiles[id].map(t => t.getData()) : [];
           if (tiles[id]) [...tiles[id]].forEach(t => t.remove());
           tileStack.forEach(tile => {
             tile.setPos(pos);
           });
         });
+        if (Object.keys(mouseMode.changes).length)
+          undoHist.push(mouseMode.changes);
       }
       mouseMode = null;
       e.preventDefault();
