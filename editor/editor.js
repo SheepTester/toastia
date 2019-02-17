@@ -41,7 +41,7 @@ class Tile {
 
   setTile(tile) {
     this.tile = tile;
-    this.elem.style.backgroundImage = `url(../tiles/${tileData[tile][0]})`;
+    this.elem.style.backgroundImage = `url(../tiles/${tileData[tile].texture})`;
   }
 
   setPos({x, y}, atBottom = false) {
@@ -113,7 +113,7 @@ function paint() {
 
 function isAcceptablePlacement(location, tile) { // alarmingly strict
   const id = toGrid(location);
-  if (tileData[tile][2]) return tiles[id] && !tiles[id].find(t => t.tile === tile);
+  if (tileData[tile].transparent) return tiles[id] && !tiles[id].find(t => t.tile === tile);
   else {
     if (tiles[id]) {
       tiles[id][0].remove();
@@ -130,19 +130,21 @@ function placeTile({x, y}, changesObj = {}) {
       changesObj[id] = changeEntry;
     }
   } else {
-    const tileX = x / GRID_SIZE >> 0;
-    const tileY = y / GRID_SIZE >> 0;
+    const tileX = Math.floor(x / GRID_SIZE);
+    const tileY = Math.floor(y / GRID_SIZE);
     if (isAcceptablePlacement({x, y}, currentTile)) {
-      new Tile({tile: currentTile, x: tileX, y: tileY, atBottom: !tileData[currentTile][2]});
+      new Tile({tile: currentTile, x: tileX, y: tileY, atBottom: !tileData[currentTile].transparent});
       changesObj[id] = changeEntry;
     }
   }
 }
 
 let mouseMode = null;
-let currentTile = null;
+let currentTile = 0;
 let selections = null;
+let selectedIcon = null;
 let undoHist = [], redoHist = [];
+let undoBtn, redoBtn;
 function deselectAll() {
   if (selections) {
     Object.keys(selections).forEach(id => {
@@ -198,38 +200,24 @@ function exportSelected() {
     return '{}';
   }
 }
-document.addEventListener('cut', e => {
-  if (selections && !mouseMode) {
-    e.clipboardData.setData('text/plain', exportSelected());
-    deleteSelected();
-    e.preventDefault();
-  }
-});
-document.addEventListener('copy', e => {
-  if (selections && !mouseMode) {
-    e.clipboardData.setData('text/plain', exportSelected());
-    e.preventDefault();
-  }
-});
-document.addEventListener('paste', e => {
-  if (!mouseMode) {
-    try {
-      const json = JSON.parse(e.clipboardData.getData('text/plain'));
-      importJSON(json);
-      e.preventDefault();
-    } catch (e) {
-      // oh well
-    }
-  }
-});
 function submitChanges(changes) {
   if (Object.keys(changes).length) {
     undoHist.push(changes);
     redoHist = [];
+    undoBtn.classList.remove('disabled');
+    redoBtn.classList.add('disabled');
   }
 }
+function isTileSelector(elem, tile) {
+  elem.addEventListener('click', e => {
+    currentTile = tile;
+    selectedIcon.classList.remove('current-tool');
+    selectedIcon = elem;
+    elem.classList.add('current-tool');
+  });
+}
 function doMaker(inArray, outArray) {
-  return () => {
+  const returnFn = () => {
     deselectAll();
     if (inArray.length) {
       const entry = inArray.pop();
@@ -245,25 +233,70 @@ function doMaker(inArray, outArray) {
         });
       })
       outArray.push(newEntry);
+      if (returnFn.onupdate) returnFn.onupdate(inArray.length);
     }
   };
+  return returnFn;
 }
 const undo = doMaker(undoHist, redoHist);
 const redo = doMaker(redoHist, undoHist);
 function init([tileDataJSON]) {
   tileData = tileDataJSON;
 
+  isTileSelector(document.getElementById('scroll'), null);
+  undoBtn = document.getElementById('undo'), redoBtn = document.getElementById('redo');
+  undo.onupdate = length => {
+    if (length === 0) undoBtn.classList.add('disabled');
+    redoBtn.classList.remove('disabled');
+  };
+  redo.onupdate = length => {
+    if (length === 0) redoBtn.classList.add('disabled');
+    undoBtn.classList.remove('disabled');
+  };
+  undoBtn.addEventListener('click', e => {
+    if (!mouseMode) undo();
+  });
+  redoBtn.addEventListener('click', e => {
+    if (!mouseMode) redo();
+  });
+  const eraserBtn = document.getElementById('eraser');
+  selectedIcon = eraserBtn;
+  selectedIcon.classList.add('current-tool');
+  isTileSelector(eraserBtn, 0);
+  const hotbar = document.getElementById('hotbar');
+  const fragment = document.createDocumentFragment();
+  const toolButtons = {};
+  Object.keys(tileData).forEach(tileID => {
+    const block = document.createElement('div');
+    block.className = 'slot block';
+    block.setAttribute('aria-label', tileData[tileID].label);
+    isTileSelector(block, tileID);
+    block.style.backgroundImage = `url(../tiles/${tileData[tileID].texture})`;
+    fragment.appendChild(block);
+    toolButtons[tileID] = block;
+  });
+  hotbar.appendChild(fragment);
+
   document.body.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${GRID_SIZE}' height='${GRID_SIZE}' fill='none' stroke='rgba(255,255,255,0.15)' stroke-width='2'%3E%3Cpath d='M0 0V${GRID_SIZE}H${GRID_SIZE}V0z'/%3E%3C/svg%3E")`;
 
   tilesWrapper = document.getElementById('tile-wrapper');
 
+  document.addEventListener('contextmenu', e => {
+    if (!tilesWrapper.contains(e.target) && e.target !== document.body) return;
+    e.preventDefault();
+  });
   document.addEventListener('mousedown', e => {
     if (!tilesWrapper.contains(e.target) && e.target !== document.body) return;
     if (!mouseMode) {
       const {x, y} = untranslate({x: e.clientX, y: e.clientY});
       const id = toGrid({x, y});
       if (e.which === 2) {
-        if (tiles[id]) currentTile = tiles[id][tiles[id].length - 1].tile;
+        if (tiles[id]) {
+          currentTile = tiles[id][tiles[id].length - 1].tile;
+          selectedIcon.classList.remove('current-tool');
+          selectedIcon = toolButtons[currentTile];
+          toolButtons[currentTile].classList.add('current-tool');
+        }
       } else if (e.shiftKey) {
         const deselecting = selections && selections[id];
         if (!selections) selections = {};
@@ -277,7 +310,7 @@ function init([tileDataJSON]) {
           deselecting,
           box
         };
-      } else if (currentTile === null || selections && !selections[id]) {
+      } else if (currentTile === null || e.which === 3 || selections && !selections[id]) {
         mouseMode = {
           type: 'scroll',
           initMouseX: e.clientX,
@@ -416,6 +449,55 @@ function init([tileDataJSON]) {
       camera.x += (e.shiftKey ? e.deltaY : e.deltaX) / camera.scale;
       camera.y += (e.shiftKey ? e.deltaX : e.deltaY) / camera.scale;
       if (e.deltaX) e.preventDefault();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!tilesWrapper.contains(e.target) && e.target !== document.body) return;
+    if (e.keyCode === 48) {
+      currentTile = 0;
+      selectedIcon.classList.remove('current-tool');
+      selectedIcon = eraserBtn;
+      eraserBtn.classList.add('current-tool');
+    } else if (!e.altKey && (e.ctrlKey || e.metaKey)) {
+      if (e.keyCode === 90 && !e.shiftKey) {
+        // ctrl/cmd + Z
+        if (!mouseMode) undo();
+      } else if (e.keyCode === 89 && !e.shiftKey || e.keyCode === 90 && e.shiftKey) {
+        // ctrl/cmd + Y, ctrl/cmd + shift + Z
+        if (!mouseMode) redo();
+      } else if (!e.shiftKey && (e.keyCode === 8 || e.keyCode === 46)) {
+        // backspace, delete
+        if (!mouseMode) deleteSelected();
+      }
+    }
+  });
+
+  document.addEventListener('cut', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (selections && !mouseMode) {
+      e.clipboardData.setData('text/plain', exportSelected());
+      deleteSelected();
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('copy', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (selections && !mouseMode) {
+      e.clipboardData.setData('text/plain', exportSelected());
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('paste', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (!mouseMode) {
+      try {
+        const json = JSON.parse(e.clipboardData.getData('text/plain'));
+        importJSON(json);
+        e.preventDefault();
+      } catch (e) {
+        console.log(e);
+      }
     }
   });
 

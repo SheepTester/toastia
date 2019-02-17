@@ -1,8 +1,8 @@
 {
-  "stone-slabs": ["stone-slabs.png", "Stone slabs", false],
-  "viney-stone-slabs": ["stone-slabs-vines.png", "Stone slabs with vines", false],
-  "sign": ["sign.png", "Sign", true],
-  "heckstone": ["steven-heckstone.png", "Heckstone", false],
-  "steven-path": ["steven-path.png", "Agitated Heckstone Path", false],
-  "steven-rock": ["steven-rock.png", "Butidk chunk", true]
+  "stone-slabs": {"texture": "stone-slabs.png", "label": "Stone slabs", "transparent": false},
+  "viney-stone-slabs": {"texture": "stone-slabs-vines.png", "label": "Stone slabs with vines", "transparent": false},
+  "sign": {"texture": "sign.png", "label": "Sign", "transparent": true},
+  "heckstone": {"texture": "steven-heckstone.png", "label": "Heckstone", "transparent": false},
+  "steven-path": {"texture": "steven-path.png", "label": "Agitated Heckstone Path", "transparent": false},
+  "steven-rock": {"texture": "steven-rock.png", "label": "Butidk chunk", "transparent": true}
 }
