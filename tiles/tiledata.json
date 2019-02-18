@@ -1,8 +1,26 @@
 {
-  "stone-slabs": {"texture": "stone-slabs.png", "label": "Stone slabs", "transparent": false},
-  "viney-stone-slabs": {"texture": "stone-slabs-vines.png", "label": "Stone slabs with vines", "transparent": false},
-  "sign": {"texture": "sign.png", "label": "Sign", "transparent": true},
-  "heckstone": {"texture": "steven-heckstone.png", "label": "Heckstone", "transparent": false},
-  "steven-path": {"texture": "steven-path.png", "label": "Agitated Heckstone Path", "transparent": false},
-  "steven-rock": {"texture": "steven-rock.png", "label": "Butidk chunk", "transparent": true}
+  "textures": {
+    "stone-slabs": {"url": "stone-slabs.png"},
+    "stone-slabs-vines": {"url": "stone-slabs-vines.png"},
+    "sign": {"url": "sign.png"},
+    "heckstone": {"url": "heckstone-edges.png", "size": [3, 3]},
+    "steven-path": {"url": "steven-path.png"},
+    "steven-rock": {"url": "steven-rock.png"}
+  },
+  "tiles": {
+    "stone-slabs": {"texture": "stone-slabs", "label": "Stone slabs", "transparent": false},
+    "viney-stone-slabs": {"texture": "stone-slabs-vines", "label": "Stone slabs with vines", "transparent": false},
+    "sign": {"texture": "sign", "label": "Sign", "transparent": true, "data": {"message": "string"}},
+    "steven-path": {"texture": "steven-path", "label": "Agitated heckstone path", "transparent": false},
+    "steven-rock": {"texture": "steven-rock", "label": "Butidk chunk", "transparent": true},
+    "heckstone": {"texture": "heckstone", "label": "Heckstone", "transparent": false, "frame": [1, 1]},
+    "heckstone-edge-n": {"texture": "heckstone", "label": "Heckstone top edge", "transparent": true, "frame": [1, 2]},
+    "heckstone-edge-w": {"texture": "heckstone", "label": "Heckstone left edge", "transparent": true, "frame": [2, 1]},
+    "heckstone-edge-s": {"texture": "heckstone", "label": "Heckstone bottom edge", "transparent": true, "frame": [1, 0]},
+    "heckstone-edge-e": {"texture": "heckstone", "label": "Heckstone right edge", "transparent": true, "frame": [0, 1]},
+    "heckstone-edge-nw": {"texture": "heckstone", "label": "Heckstone top-left corner", "transparent": true, "frame": [2, 2]},
+    "heckstone-edge-ne": {"texture": "heckstone", "label": "Heckstone top-right corner", "transparent": true, "frame": [0, 2]},
+    "heckstone-edge-sw": {"texture": "heckstone", "label": "Heckstone bottom-left corner", "transparent": true, "frame": [2, 0]},
+    "heckstone-edge-se": {"texture": "heckstone", "label": "Heckstone bottom-right corner", "transparent": true, "frame": [0, 0]}
+  }
 }

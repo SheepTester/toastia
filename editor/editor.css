@@ -19,7 +19,7 @@ body {
   height: 150px;
   background-repeat: no-repeat;
   background-size: contain;
-  background-position: center;
+  background-position: 0 0;
   image-rendering: pixelated;
 }
 .selected {
@@ -89,10 +89,13 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 .block {
+  width: 30px;
+  height: 30px;
   background-repeat: no-repeat;
   background-size: 30px;
-  background-position: center;
+  background-position: 0 0;
   image-rendering: pixelated;
+  transition: transform .2s;
 }
 .current-tool {
   cursor: default;
@@ -102,11 +105,8 @@ body {
   border-bottom: 2px solid #5b5b5b;
   border-right: 2px solid #5b5b5b;
 }
-.current-tool .icon {
+.current-tool .icon, .current-tool .block {
   transform: scale(1.2);
-}
-.block.current-tool {
-  background-size: 35px;
 }
 .disabled {
   opacity: 0.5;

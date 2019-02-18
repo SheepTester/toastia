@@ -19,7 +19,7 @@ function toGrid({x, y}) {
 }
 
 const tiles = {};
-let tileData;
+let tileData, tileTextures;
 class Tile {
 
   constructor({tile = 'stone-slabs', x = 0, y = 0, atBottom = false, data = null, noPosition = false}) {
@@ -41,7 +41,7 @@ class Tile {
 
   setTile(tile) {
     this.tile = tile;
-    this.elem.style.backgroundImage = `url(../tiles/${tileData[tile].texture})`;
+    setTexture(this.elem, tile);
   }
 
   setPos({x, y}, atBottom = false) {
@@ -216,6 +216,18 @@ function isTileSelector(elem, tile) {
     elem.classList.add('current-tool');
   });
 }
+function setTexture(elem, tile) {
+  const texture = tileTextures[tileData[tile].texture];
+  elem.style.backgroundImage = `url(../tiles/${texture.url})`;
+  const size = texture.size;
+  const frame = tileData[tile].frame;
+  if (size) {
+    elem.style.backgroundSize = `${size[0] * 100}% ${size[1] * 100}%`;
+    if (frame) {
+      elem.style.backgroundPosition = `${frame[0] * 100 / (size[0] - 1)}% ${frame[1] * 100 / (size[1] - 1)}%`;
+    }
+  }
+}
 function doMaker(inArray, outArray) {
   const returnFn = () => {
     deselectAll();
@@ -241,7 +253,8 @@ function doMaker(inArray, outArray) {
 const undo = doMaker(undoHist, redoHist);
 const redo = doMaker(redoHist, undoHist);
 function init([tileDataJSON]) {
-  tileData = tileDataJSON;
+  tileData = tileDataJSON.tiles;
+  tileTextures = tileDataJSON.textures;
 
   isTileSelector(document.getElementById('scroll'), null);
   undoBtn = document.getElementById('undo'), redoBtn = document.getElementById('redo');
@@ -268,11 +281,14 @@ function init([tileDataJSON]) {
   const toolButtons = {};
   Object.keys(tileData).forEach(tileID => {
     const block = document.createElement('div');
-    block.className = 'slot block';
-    block.setAttribute('aria-label', tileData[tileID].label);
-    isTileSelector(block, tileID);
-    block.style.backgroundImage = `url(../tiles/${tileData[tileID].texture})`;
-    fragment.appendChild(block);
+    block.classList.add('block');
+    setTexture(block, tileID);
+    const slot = document.createElement('div');
+    slot.classList.add('slot');
+    slot.setAttribute('aria-label', tileData[tileID].label);
+    isTileSelector(slot, tileID);
+    slot.appendChild(block);
+    fragment.appendChild(slot);
     toolButtons[tileID] = block;
   });
   hotbar.appendChild(fragment);
