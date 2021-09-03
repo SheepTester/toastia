@@ -469,7 +469,7 @@ function init([tileDataJSON]) {
   });
 
   document.addEventListener('keydown', e => {
-    if (!tilesWrapper.contains(e.target) && e.target !== document.body) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if (e.keyCode === 48) {
       currentTile = 0;
       selectedIcon.classList.remove('current-tool');
